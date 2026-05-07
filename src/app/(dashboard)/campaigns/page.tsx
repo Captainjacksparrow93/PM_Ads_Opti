@@ -2,7 +2,7 @@
 import { useState } from "react";
 import {
   Search, Plus, Filter, Pause, Play, ExternalLink, Bot,
-  TrendingUp, TrendingDown, ChevronDown,
+  TrendingUp, TrendingDown, ChevronDown, Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,19 @@ import { MOCK_CAMPAIGNS } from "@/lib/mock-data";
 import { formatCurrency, formatROAS, formatPercent, formatCompact, cn } from "@/lib/utils";
 import { STATUS_COLORS, STATUS_LABELS, OBJECTIVE_LABELS, PLATFORM_LABELS } from "@/lib/constants";
 import { toast } from "sonner";
-import type { Campaign, CampaignStatus, Platform } from "@/types";
+import type { Campaign, CampaignStatus, OptimizationFrequency, Platform } from "@/types";
+
+const FREQ_LABELS: Record<OptimizationFrequency, string> = {
+  "15min": "15 min",
+  "30min": "30 min",
+  "1hour": "1 hour",
+  "3hours": "3 hrs",
+  "6hours": "6 hrs",
+  "12hours": "12 hrs",
+  "daily": "Daily",
+};
+
+const FREQ_OPTIONS: OptimizationFrequency[] = ["15min", "30min", "1hour", "3hours", "6hours", "12hours", "daily"];
 
 const PLATFORM_BADGE: Record<Platform, string> = {
   meta: "bg-blue-500 text-white",
@@ -43,6 +55,8 @@ export default function CampaignsPage() {
   const [statusFilter, setStatusFilter] = useState<CampaignStatus | "all">("all");
   const [newCampOpen, setNewCampOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [freqCamp, setFreqCamp] = useState<Campaign | null>(null);
+  const [selectedFreq, setSelectedFreq] = useState<OptimizationFrequency>("1hour");
 
   const campaigns = MOCK_CAMPAIGNS.filter((c) => {
     const isClientMatch = !selectedClient || c.client_id === selectedClient.id;
@@ -124,7 +138,7 @@ export default function CampaignsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
-                {["Campaign", "Platform", "Objective", "Status", "Daily Budget", "Spend", "ROAS", "CPA", "Conversions", "CTR", ""].map((h) => (
+                {["Campaign", "Platform", "Objective", "Status", "AI Frequency", "Daily Budget", "Spend", "ROAS", "CPA", "Conversions", "CTR", ""].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap last:text-right">
                     {h}
                   </th>
@@ -168,6 +182,15 @@ export default function CampaignsPage() {
                       <span className={cn("text-xs px-2.5 py-1 rounded-full font-medium border", STATUS_COLORS[camp.status])}>
                         {STATUS_LABELS[camp.status]}
                       </span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <button
+                        onClick={() => { setFreqCamp(camp); setSelectedFreq(camp.optimization_frequency); }}
+                        className="flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100 hover:bg-violet-50 hover:text-violet-700 px-2.5 py-1 rounded-full font-medium transition-colors border border-transparent hover:border-violet-200"
+                      >
+                        <Clock className="w-3 h-3" />
+                        {FREQ_LABELS[camp.optimization_frequency]}
+                      </button>
                     </td>
                     <td className="px-4 py-3.5 text-sm text-slate-700">{formatCurrency(camp.daily_budget)}/day</td>
                     <td className="px-4 py-3.5">
@@ -217,6 +240,41 @@ export default function CampaignsPage() {
           </table>
         </div>
       </Card>
+
+      {/* Optimization Frequency Dialog */}
+      <Dialog open={!!freqCamp} onOpenChange={(o) => !o && setFreqCamp(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-violet-600" /> AI Optimization Frequency
+            </DialogTitle>
+            <DialogDescription>
+              How often the AI checks performance and applies optimizations for <span className="font-semibold text-slate-700">{freqCamp?.name}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-2 py-2">
+            {FREQ_OPTIONS.map((f) => (
+              <button
+                key={f}
+                onClick={() => setSelectedFreq(f)}
+                className={cn("p-2.5 border rounded-lg text-xs font-medium text-center transition-colors",
+                  selectedFreq === f ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600 hover:border-slate-300"
+                )}
+              >
+                {FREQ_LABELS[f]}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-400">More frequent = faster reaction to performance changes. Less frequent = fewer API calls and more stable decisions.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFreqCamp(null)}>Cancel</Button>
+            <Button className="bg-violet-600 hover:bg-violet-500" onClick={() => {
+              toast.success(`Optimization frequency set to ${FREQ_LABELS[selectedFreq]} for "${freqCamp?.name}"`);
+              setFreqCamp(null);
+            }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* AI Create Campaign Dialog */}
       <Dialog open={newCampOpen} onOpenChange={setNewCampOpen}>

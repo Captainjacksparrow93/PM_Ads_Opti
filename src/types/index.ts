@@ -10,12 +10,46 @@ export type AIActionType =
   | "pause_ad" | "enable_ad" | "pause_adset" | "enable_adset"
   | "create_campaign" | "update_targeting" | "asset_swap" | "campaign_created";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
+export type OptimizationFrequency = "15min" | "30min" | "1hour" | "3hours" | "6hours" | "12hours" | "daily";
 
 export interface Agency {
   id: string;
   name: string;
   logo_url?: string;
   created_at: string;
+}
+
+export interface ClientGoal {
+  target_roas?: number;
+  target_cpa?: number;
+  target_revenue?: number;
+  monthly_budget?: number;
+  timeframe_start?: string;
+  timeframe_end?: string;
+  notes?: string;
+}
+
+export interface ShopifyStore {
+  id: string;
+  client_id: string;
+  store_url: string;
+  store_name: string;
+  connected_at: string;
+  currency: string;
+  total_revenue?: number;
+  total_orders?: number;
+  avg_order_value?: number;
+  conversion_rate?: number;
+}
+
+export interface TelegramConfig {
+  bot_token: string;
+  chat_id: string;
+  notify_pending_approvals: boolean;
+  notify_campaign_alerts: boolean;
+  notify_budget_alerts: boolean;
+  notify_weekly_report: boolean;
+  notify_ai_actions: boolean;
 }
 
 export interface Client {
@@ -27,13 +61,17 @@ export interface Client {
   website?: string;
   meta_connected: boolean;
   google_connected: boolean;
+  shopify_connected: boolean;
+  shopify_store_url?: string;
   monthly_budget?: number;
   currency: string;
+  goal?: ClientGoal;
   created_at: string;
   campaign_count?: number;
   active_campaigns?: number;
   total_spend?: number;
   roas?: number;
+  shopify_revenue?: number;
 }
 
 export interface AdAccount {
@@ -75,6 +113,7 @@ export interface Campaign {
   targets: CampaignTarget;
   metrics: CampaignMetrics;
   ai_managed: boolean;
+  optimization_frequency: OptimizationFrequency;
   created_at: string;
   updated_at: string;
 }
@@ -167,6 +206,9 @@ export interface DashboardMetrics {
   active_campaigns_change: number;
   pending_approvals: number;
   ai_actions_today: number;
+  shopify_revenue?: number;
+  shopify_orders?: number;
+  shopify_revenue_change?: number;
 }
 
 export interface ChartDataPoint {
@@ -175,6 +217,7 @@ export interface ChartDataPoint {
   roas: number;
   conversions: number;
   clicks: number;
+  shopify_revenue?: number;
 }
 
 export interface ClientContextValue {

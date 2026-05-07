@@ -2,6 +2,7 @@
 import {
   TrendingUp, TrendingDown, DollarSign, Target, ShoppingCart,
   Megaphone, Bot, CheckCircle2, Clock, ArrowRight, Zap, AlertCircle,
+  ShoppingBag,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -21,7 +22,7 @@ import { STATUS_COLORS, STATUS_LABELS, PLATFORM_LABELS } from "@/lib/constants";
 
 const KPI_CARDS = [
   {
-    label: "Total Spend",
+    label: "Total Ad Spend",
     value: formatCurrency(MOCK_DASHBOARD_METRICS.total_spend),
     change: MOCK_DASHBOARD_METRICS.total_spend_change,
     icon: DollarSign,
@@ -39,13 +40,14 @@ const KPI_CARDS = [
     positive_is_good: true,
   },
   {
-    label: "Conversions",
-    value: formatCompact(MOCK_DASHBOARD_METRICS.total_conversions),
-    change: MOCK_DASHBOARD_METRICS.total_conversions_change,
-    icon: ShoppingCart,
+    label: "Shopify Revenue",
+    value: formatCurrency(MOCK_DASHBOARD_METRICS.shopify_revenue ?? 0),
+    change: MOCK_DASHBOARD_METRICS.shopify_revenue_change ?? 0,
+    icon: ShoppingBag,
     color: "text-emerald-600",
     bg: "bg-emerald-50",
     positive_is_good: true,
+    sub: `${formatCompact(MOCK_DASHBOARD_METRICS.shopify_orders ?? 0)} orders`,
   },
   {
     label: "Active Campaigns",
@@ -68,7 +70,7 @@ function CustomTooltip({ active, payload, label }: any) {
           <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
           <span className="text-slate-500">{p.name}:</span>
           <span className="font-medium text-slate-800">
-            {p.dataKey === "spend" ? formatCurrency(p.value) : p.dataKey === "roas" ? formatROAS(p.value) : formatCompact(p.value)}
+            {(p.dataKey === "spend" || p.dataKey === "shopify_revenue") ? formatCurrency(p.value) : p.dataKey === "roas" ? formatROAS(p.value) : formatCompact(p.value)}
           </span>
         </div>
       ))}
@@ -112,9 +114,10 @@ export default function OverviewPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {KPI_CARDS.map(({ label, value, change, icon: Icon, color, bg, positive_is_good }) => {
+        {KPI_CARDS.map(({ label, value, change, icon: Icon, color, bg, positive_is_good, ...rest }) => {
           const isPositive = change >= 0;
           const isGood = positive_is_good ? isPositive : !isPositive;
+          const sub = (rest as any).sub as string | undefined;
           return (
             <Card key={label} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-5">
@@ -122,6 +125,7 @@ export default function OverviewPage() {
                   <div>
                     <p className="text-sm text-slate-500 font-medium">{label}</p>
                     <p className="text-3xl font-bold text-slate-900 mt-1">{value}</p>
+                    {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
                     <div className={cn("flex items-center gap-1 mt-2 text-xs font-medium", isGood ? "text-emerald-600" : "text-red-500")}>
                       {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                       {formatChange(change)} vs last month
@@ -161,7 +165,7 @@ export default function OverviewPage() {
                     <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.15} />
                     <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
                   </linearGradient>
-                  <linearGradient id="convGrad" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="shopifyGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
@@ -170,8 +174,8 @@ export default function OverviewPage() {
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="spend" name="Spend" stroke="#7c3aed" strokeWidth={2} fill="url(#spendGrad)" dot={false} />
-                <Area type="monotone" dataKey="conversions" name="Conversions" stroke="#10b981" strokeWidth={2} fill="url(#convGrad)" dot={false} />
+                <Area type="monotone" dataKey="spend" name="Ad Spend" stroke="#7c3aed" strokeWidth={2} fill="url(#spendGrad)" dot={false} />
+                <Area type="monotone" dataKey="shopify_revenue" name="Shopify Revenue" stroke="#10b981" strokeWidth={2} fill="url(#shopifyGrad)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
