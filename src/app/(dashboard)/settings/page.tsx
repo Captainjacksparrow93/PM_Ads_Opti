@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Key, Bot, Globe, Shield, Users, CheckCircle2, Eye, EyeOff,
   Plus, Trash2, RefreshCw, AlertCircle, Wifi, WifiOff,
@@ -435,11 +436,61 @@ function TelegramTab() {
   );
 }
 
-export default function SettingsPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  meta_access_denied: "Meta: you cancelled the OAuth flow.",
+  meta_invalid_state: "Meta: invalid state — please try again.",
+  meta_no_ad_accounts: "Meta: no ad accounts found on this Facebook profile.",
+  meta_not_configured: "Meta API credentials are not configured yet. Add META_APP_ID and META_APP_SECRET in Vercel.",
+  meta_failed: "Meta connection failed. Check your API credentials and try again.",
+  google_access_denied: "Google: you cancelled the OAuth flow.",
+  google_invalid_state: "Google: invalid state — please try again.",
+  google_not_configured: "Google API credentials are not configured yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel.",
+  google_failed: "Google connection failed. Check your API credentials and try again.",
+};
+
+function SettingsPageInner() {
   const { selectedClient } = useClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("manager");
+  const [metaConnected, setMetaConnected] = useState(selectedClient?.meta_connected ?? false);
+  const [googleConnected, setGoogleConnected] = useState(selectedClient?.google_connected ?? false);
+  const [metaAccounts, setMetaAccounts] = useState<string>("");
+  const [googleAccounts, setGoogleAccounts] = useState<string>("");
+
+  // Handle OAuth callback results
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+    const names = searchParams.get("names") ?? "";
+    const count = searchParams.get("accounts") ?? "1";
+
+    if (success === "meta") {
+      setMetaConnected(true);
+      setMetaAccounts(names);
+      toast.success(`Meta Ads connected! ${count} ad account(s) linked.`);
+      router.replace("/settings?tab=connections");
+    } else if (success === "google") {
+      setGoogleConnected(true);
+      setGoogleAccounts(names);
+      toast.success(`Google Ads connected! ${count} customer account(s) linked.`);
+      router.replace("/settings?tab=connections");
+    } else if (error) {
+      toast.error(ERROR_MESSAGES[error] ?? "Connection failed. Please try again.");
+      router.replace("/settings?tab=connections");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync connected state when client changes
+  useEffect(() => {
+    setMetaConnected(selectedClient?.meta_connected ?? false);
+    setGoogleConnected(selectedClient?.google_connected ?? false);
+    setMetaAccounts("");
+    setGoogleAccounts("");
+  }, [selectedClient?.id]);
 
   const handleInvite = () => {
     toast.success(`Invitation sent to ${inviteEmail}`);
@@ -447,9 +498,11 @@ export default function SettingsPage() {
     setInviteEmail("");
   };
 
+  const defaultTab = searchParams.get("tab") ?? "integrations";
+
   return (
     <div className="max-w-3xl mx-auto">
-      <Tabs defaultValue="integrations">
+      <Tabs defaultValue={defaultTab}>
         <TabsList className="w-full mb-6 grid grid-cols-7">
           <TabsTrigger value="integrations" className="gap-1.5 text-xs"><Key className="w-3.5 h-3.5" />API Keys</TabsTrigger>
           <TabsTrigger value="connections" className="gap-1.5 text-xs"><Wifi className="w-3.5 h-3.5" />Ad Accounts</TabsTrigger>
@@ -498,22 +551,48 @@ export default function SettingsPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              {selectedClient?.meta_connected ? (
+              {metaConnected ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg">
-                    <span className="text-slate-600">Account ID</span>
-                    <span className="font-mono font-medium text-slate-800">act_23855501234</span>
+                    <span className="text-slate-600">Status</span>
+                    <span className="flex items-center gap-1 text-emerald-700 font-medium"><CheckCircle2 className="w-3 h-3" /> Token active</span>
                   </div>
+                  {metaAccounts && (
+                    <div className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg">
+                      <span className="text-slate-600">Ad Accounts</span>
+                      <span className="font-medium text-slate-800 text-right max-w-[60%] truncate">{metaAccounts}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg">
-                    <span className="text-slate-600">Account Name</span>
-                    <span className="font-medium text-slate-800">{selectedClient.name} — Main</span>
+                    <span className="text-slate-600">Client</span>
+                    <span className="font-medium text-slate-800">{selectedClient?.name}</span>
                   </div>
-                  <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50 mt-2">Disconnect</Button>
+                  <Button
+                    variant="outline" size="sm"
+                    className="text-red-600 border-red-200 hover:bg-red-50 mt-2"
+                    onClick={() => { setMetaConnected(false); toast.success("Meta Ads disconnected."); }}
+                  >
+                    Disconnect
+                  </Button>
                 </div>
               ) : (
-                <Button className="bg-blue-600 hover:bg-blue-500 gap-2 w-full">
-                  <Globe className="w-4 h-4" /> Connect Meta Ads via OAuth
-                </Button>
+                <div className="space-y-3">
+                  {!selectedClient && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      Select a client from the sidebar first.
+                    </p>
+                  )}
+                  <Button
+                    asChild
+                    className="bg-blue-600 hover:bg-blue-500 gap-2 w-full"
+                    disabled={!selectedClient}
+                  >
+                    <a href={selectedClient ? `/api/auth/meta?client_id=${selectedClient.id}` : "#"}>
+                      <Globe className="w-4 h-4" /> Connect Meta Ads via OAuth
+                    </a>
+                  </Button>
+                  <p className="text-xs text-slate-400">You&apos;ll be redirected to Facebook to authorise access. Make sure META_APP_ID and META_APP_SECRET are set in Vercel first.</p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -531,29 +610,55 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <span className={cn("flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border",
-                  selectedClient?.google_connected ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-slate-500 bg-slate-50 border-slate-200"
+                  googleConnected ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-slate-500 bg-slate-50 border-slate-200"
                 )}>
-                  {selectedClient?.google_connected ? <><CheckCircle2 className="w-3.5 h-3.5" />Connected</> : <><WifiOff className="w-3.5 h-3.5" />Not connected</>}
+                  {googleConnected ? <><CheckCircle2 className="w-3.5 h-3.5" />Connected</> : <><WifiOff className="w-3.5 h-3.5" />Not connected</>}
                 </span>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              {selectedClient?.google_connected ? (
+              {googleConnected ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg">
-                    <span className="text-slate-600">Customer ID</span>
-                    <span className="font-mono font-medium text-slate-800">987-123-4567</span>
+                    <span className="text-slate-600">Status</span>
+                    <span className="flex items-center gap-1 text-emerald-700 font-medium"><CheckCircle2 className="w-3 h-3" /> Token + refresh token stored</span>
                   </div>
+                  {googleAccounts && (
+                    <div className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg">
+                      <span className="text-slate-600">Customer Accounts</span>
+                      <span className="font-medium text-slate-800 text-right max-w-[60%] truncate">{googleAccounts}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg">
-                    <span className="text-slate-600">Account Name</span>
-                    <span className="font-medium text-slate-800">{selectedClient.name} — Google Ads</span>
+                    <span className="text-slate-600">Client</span>
+                    <span className="font-medium text-slate-800">{selectedClient?.name}</span>
                   </div>
-                  <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50 mt-2">Disconnect</Button>
+                  <Button
+                    variant="outline" size="sm"
+                    className="text-red-600 border-red-200 hover:bg-red-50 mt-2"
+                    onClick={() => { setGoogleConnected(false); toast.success("Google Ads disconnected."); }}
+                  >
+                    Disconnect
+                  </Button>
                 </div>
               ) : (
-                <Button className="bg-green-600 hover:bg-green-500 gap-2 w-full">
-                  <Globe className="w-4 h-4" /> Connect Google Ads via OAuth
-                </Button>
+                <div className="space-y-3">
+                  {!selectedClient && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      Select a client from the sidebar first.
+                    </p>
+                  )}
+                  <Button
+                    asChild
+                    className="bg-green-600 hover:bg-green-500 gap-2 w-full"
+                    disabled={!selectedClient}
+                  >
+                    <a href={selectedClient ? `/api/auth/google?client_id=${selectedClient.id}` : "#"}>
+                      <Globe className="w-4 h-4" /> Connect Google Ads via OAuth
+                    </a>
+                  </Button>
+                  <p className="text-xs text-slate-400">You&apos;ll be redirected to Google to authorise access. Make sure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_DEVELOPER_TOKEN are set in Vercel first.</p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -700,5 +805,13 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="max-w-3xl mx-auto p-6 text-slate-400 text-sm">Loading settings…</div>}>
+      <SettingsPageInner />
+    </Suspense>
   );
 }
